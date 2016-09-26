@@ -5,7 +5,7 @@ document.body.appendChild(c);
 c.width = window.innerWidth;
 c.height = window.innerHeight;
 let ctx = c.getContext('2d');
-/* load bitmap */
+/* load bitmaps */
 let shipImg = new Image();
 Object.assign(shipImg,{
   src: 'http://i.stack.imgur.com/rsH6n.png',
@@ -27,16 +27,21 @@ Object.assign(enemyImg, {
 let explosionSprite = new Image();
 explosionSprite.src = 'http://orig06.deviantart.net/28c3/f/2013/010/9/f/explosion_spritesheet_for_games_by_gintasdx-d5r28q5.png';
 let explosionSpriteCount = explosionSprite.width/ explosionSprite.height;
-/* sound subject */
-let laser = new Audio('http://www.freesound.org/data/previews/170/170161_2578041-lq.mp3')
+
+/* Laser Subjects */
+let laserSound = new Audio('http://www.freesound.org/data/previews/170/170161_2578041-lq.mp3');
 const shootSubject = new Rx.Subject();
 shootSubject.subscribe(o=>{
-  laser.currentTime = 1;
-  laser.play()
+  laserSound.currentTime = 1;
+  laserSound.play();
 });
-/* ExplosionSubject */
+
+/* Explosion Subject */
+let explosionSound = new Audio('http://www.freesound.org/data/previews/259/259962_2463454-lq.mp3');
 let explosionSubject = new Rx.Subject();
 explosionSubject.subscribe(({x,y})=>{
+  explosionSound.currentTime = 0.5;
+  explosionSound.play();
   Rx.Observable.interval(16)
   .takeWhile(frame=>frame<explosionSpriteCount*2)
   .subscribe(frame=>{
