@@ -8,7 +8,7 @@ let ctx = c.getContext('2d');
 /* load bitmaps */
 let shipImg = new Image();
 Object.assign(shipImg,{
-  src: 'http://i.stack.imgur.com/rsH6n.png',
+  src: 'https://i.stack.imgur.com/rsH6n.png',
   width: 64,
   height: 64
 });
@@ -20,16 +20,16 @@ Object.assign(bulletImg, {
 });
 let enemyImg = new Image();
 Object.assign(enemyImg, {
-  src: 'http://www.codeproject.com/KB/game/677417/Ship3.png',
+  src: 'https://www.codeproject.com/KB/game/677417/Ship3.png',
   width: 64,
   height: 64
 });
 let explosionSprite = new Image();
-explosionSprite.src = 'http://orig06.deviantart.net/28c3/f/2013/010/9/f/explosion_spritesheet_for_games_by_gintasdx-d5r28q5.png';
+explosionSprite.src = 'https://orig06.deviantart.net/28c3/f/2013/010/9/f/explosion_spritesheet_for_games_by_gintasdx-d5r28q5.png';
 let explosionSpriteCount = explosionSprite.width/ explosionSprite.height;
 
 /* Laser Subjects */
-let laserSound = new Audio('http://www.freesound.org/data/previews/170/170161_2578041-lq.mp3');
+let laserSound = new Audio('https://www.freesound.org/data/previews/170/170161_2578041-lq.mp3');
 const shootSubject = new Rx.Subject();
 shootSubject.subscribe(o=>{
   laserSound.currentTime = 1;
@@ -56,6 +56,11 @@ explosionSubject.subscribe(({x,y})=>{
     );
   })
 });
+
+/* collion helper */
+const collision = (aPosition, aSize, bPosition, bSize)=>
+  (aPosition.x + aSize.width > bPosition.x) && (aPosition.x < bPosition.x+bSize.width ) &&
+  (aPosition.y + aSize.height> bPosition.y) && (aPosition.y < bPosition.y+bSize.height )
 
 /* StarStream */
 const paintStars = (stars)=> {
@@ -89,9 +94,9 @@ const ShipStream =
     Rx.Observable.fromEvent(c, 'mousemove'),
     Rx.Observable.fromEvent(c, 'touchmove')
   )
-    .map(({clientX, clientY})=>({x: clientX-32, y: c.height - 64}))
+    .map(({clientX, clientY})=>({x: clientX-32, y: c.height - 100}))
     .startWith({
-      x: -32+c.width/2, y: c.height - 64
+      x: -32+c.width/2, y: c.height - 100
     });
 const paintEnemy = ({x,y})=>ctx.drawImage(enemyImg, x, y, 64, 64)
 const paintEnemies = enemies=>{
@@ -119,10 +124,6 @@ const EnemyStream = Rx.Observable.interval(950)
   },{})
   .startWith({});
 
-/* collion helper */
-const collision = (aPosition, aSize, bPosition, bSize)=>
-  (aPosition.x + aSize.width > bPosition.x) && (aPosition.x < bPosition.x+bSize.width ) &&
-  (aPosition.y + aSize.height> bPosition.y) && (aPosition.y < bPosition.y+bSize.height )
 /* ProjectileStream */
 const paintProjectile = ({x,y})=>ctx.drawImage(bulletImg, x, y, 32, 32);
 const paintProjectiles = (projectiles, enemies)=> {
@@ -160,13 +161,16 @@ const ProjectileStream = ProjectileTrig
   .map(({x,y})=>({
     x: x+(shipImg.width-bulletImg.width)/2,
     y: y-(bulletImg.height)/2,
+    vx: Math.random()*2-1,
+    vy: 3,
     t: +new Date()
   }))
   .map(b=>
     Rx.Observable.interval(10)
       .map(d=>5)
       .map(d=>Object.assign(b, {
-        y: b.y - d
+        x: b.x - b.vx,
+        y: b.y - b.vy
       }))
   )
   .flatMap(o=>o)
@@ -190,5 +194,5 @@ Rx.Observable.combineLatest(
     paintStars(stars);
     paintShip(ship);
     paintProjectiles(projectiles, enemies);
-    paintEnemies(enemies);
+    paintEnemies(enemies, ship);
   });
