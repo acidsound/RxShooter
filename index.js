@@ -121,11 +121,14 @@ let ShipStream = Rx.Observable.merge(
 )
 .startWith({
   x: -32 + (c.width / 2),
-  y: c.height - 100
+  y: c.height - 100,
+  life: 3
 });
 
 // Dead Stream
-let DeadStream = new Rx.Subject;
+let DeadSubject = new Rx.Subject;
+let DeadStream = DeadSubject.throttleTime(300)
+  .bufferCount(3);
 
 /* EnemyStream */
 let paintEnemy = ({x,y}) => ctx.drawImage(enemyImg, x, y, 64, 64);
@@ -137,7 +140,7 @@ let paintEnemies = (enemies, ship) =>
       let item;
       paintEnemy(enemy);
       if (collision(ship, shipImg, enemy, enemyImg)) {
-        DeadStream.next(ship);
+        DeadStream.next(enemies);
         item = enemy.y = c.height + 100;
       }
       result.push(item);
@@ -167,11 +170,12 @@ let EnemyStream = Rx.Observable.interval(950)
   return a;
 }
 , {})
-.startWith({});
+.startWith({})
+.takeUntil(DeadStream)
+.repeat();
 
 /* ProjectileStream */
 let paintProjectile = ({x,y}) => ctx.drawImage(bulletImg, x, y, 32, 32);
-
 let paintProjectiles = (projectiles, enemies) =>
   (() => {
     let result = [];
@@ -257,9 +261,7 @@ Rx.Observable.fromEvent(document, "DOMContentLoaded")
     .takeUntil(Rx.Observable.timer(3500))
     .subscribe(paintGameOver, (function() {}), goTitle)
   ;
-
   let goGame = () => {
-    console.log("game");
     /* Combine All */
     return Rx.Observable.combineLatest(StarStream, ShipStream, ProjectileStream, EnemyStream,
       (stars, ship, projectiles, enemies) => ({stars,ship,projectiles,enemies}))

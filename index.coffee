@@ -106,9 +106,12 @@ ShipStream = Rx.Observable.merge(
 .startWith
   x: -32 + c.width / 2
   y: c.height - 100
+  life: 3
 
 # Dead Stream
-DeadStream = new Rx.Subject
+DeadSubject = new Rx.Subject
+DeadStream = DeadSubject.throttleTime 300
+  .bufferCount 3
 
 ### EnemyStream ###
 paintEnemy = ({x,y}) -> ctx.drawImage enemyImg, x, y, 64, 64
@@ -116,7 +119,7 @@ paintEnemies = (enemies, ship) ->
   for _, enemy of enemies
     paintEnemy enemy
     if collision ship, shipImg, enemy, enemyImg
-      DeadStream.next ship
+      DeadStream.next enemies
       enemy.y = c.height + 100
 
 EnemyStream = Rx.Observable.interval 950
@@ -136,10 +139,11 @@ EnemyStream = Rx.Observable.interval 950
   a
 , {}
 .startWith {}
+.takeUntil DeadStream
+.repeat()
 
 ### ProjectileStream ###
 paintProjectile = ({x,y}) -> ctx.drawImage bulletImg, x, y, 32, 32
-
 paintProjectiles = (projectiles, enemies) ->
   for _, projectile of projectiles
     paintProjectile projectile
@@ -199,9 +203,7 @@ Rx.Observable.fromEvent document, "DOMContentLoaded"
     Rx.Observable.interval FPS
     .takeUntil Rx.Observable.timer 3500
     .subscribe paintGameOver, (->), goTitle
-
   goGame = =>
-    console.log "game"
     ### Combine All ###
     Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
       (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
