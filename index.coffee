@@ -176,9 +176,10 @@ ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map (x) -> x[1]
 Rx.Observable.fromEvent document, "DOMContentLoaded"
 .subscribe =>
   # TODO Loading Splash 구현
-  PreloadSteam.subscribe ->,
+  PreloadSteam.subscribe console.log,
     -> console.log "error"
     -> # on Complete
+      console.log "init"
       Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
         (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
       .sample Rx.Observable.interval(16)
