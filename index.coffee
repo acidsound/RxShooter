@@ -28,15 +28,34 @@ explosionSprite = new Image
 explosionSprite.src = 'https://orig06.deviantart.net/28c3/f/2013/010/9/f/explosion_spritesheet_for_games_by_gintasdx-d5r28q5.png'
 explosionSpriteCount = explosionSprite.width / explosionSprite.height
 
-### Laser Subjects ###
-laserSound = new Audio 'https://www.freesound.org/data/previews/170/170161_2578041-lq.mp3'
+### Audio Subjects ###
+laserSound = new Audio
+laserSound.volume = 0.3
+laserSound.src = 'https://www.freesound.org/data/previews/170/170161_2578041-lq.mp3'
+
+explosionSound = new Audio
+explosionSound.src = 'http://www.freesound.org/data/previews/259/259962_2463454-lq.mp3'
+
+### Subjects ###
 shootSubject = new Rx.Subject
-shootSubject.subscribe (o) ->
+shootSubject.subscribe ->
   laserSound.currentTime = 1
   laserSound.play()
 
-### Explosion Subject ###
-explosionSound = new Audio 'http://www.freesound.org/data/previews/259/259962_2463454-lq.mp3'
+#### After Load ###
+preloadObjects = [
+  shipImg
+  bulletImg
+  enemyImg
+  explosionSprite
+]
+PreloadSteam = Rx.Observable.from preloadObjects
+.flatMap (obj)->
+  Rx.Observable.create (o)->
+    obj.onload = ->
+      o.next obj
+      o.complete()
+.take preloadObjects.length+1
 explosionSubject = new Rx.Subject
 explosionSubject.subscribe ({x,y}) ->
   explosionSound.currentTime = 0.5
@@ -140,9 +159,8 @@ ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map (x) -> x[1]
   vy: 3
   t: +new Date
 .map (b) ->
-  Rx.Observable.interval(10).map((d) ->
-    5
-  ).map (d) ->
+  Rx.Observable.interval 10
+  .map ->
     Object.assign b,
       x: b.x - (b.vx)
       y: b.y - (b.vy)
@@ -152,15 +170,21 @@ ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map (x) -> x[1]
   if b.y > -bulletImg.height then a[b.t] = b else delete a[b.t]
   a
 , {}
-.startWith({})
+.startWith {}
 
 ### Combine All ###
-Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
-  (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
-.sample Rx.Observable.interval(16)
-.takeWhile -> true
-.subscribe ({stars, ship, projectiles, enemies}) ->
-  paintStars stars
-  paintShip ship
-  paintProjectiles projectiles, enemies
-  paintEnemies enemies, ship
+Rx.Observable.fromEvent document, "DOMContentLoaded"
+.subscribe =>
+  # TODO Loading Splash 구현
+  PreloadSteam.subscribe ->,
+    -> console.log "error"
+    -> # on Complete
+      Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
+        (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
+      .sample Rx.Observable.interval(16)
+      .takeWhile -> true
+      .subscribe ({stars, ship, projectiles, enemies}) ->
+        paintStars stars
+        paintShip ship
+        paintProjectiles projectiles, enemies
+        paintEnemies enemies, ship
