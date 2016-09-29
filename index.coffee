@@ -107,10 +107,18 @@ ShipStream = Rx.Observable.merge(
   x: -32 + c.width / 2
   y: c.height - 100
 
-paintEnemy = ({x,y}) -> ctx.drawImage enemyImg, x, y, 64, 64
-paintEnemies = (enemies) -> paintEnemy enemy for _, enemy of enemies
+# Dead Stream
+DeadStream = new Rx.Subject
 
 ### EnemyStream ###
+paintEnemy = ({x,y}) -> ctx.drawImage enemyImg, x, y, 64, 64
+paintEnemies = (enemies, ship) ->
+  for _, enemy of enemies
+    paintEnemy enemy
+    if collision ship, shipImg, enemy, enemyImg
+      DeadStream.next ship
+      enemy.y = c.height + 100
+
 EnemyStream = Rx.Observable.interval 950
 .map ->
     x: Math.random() * c.width - (enemyImg.width)
@@ -175,9 +183,6 @@ ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map (x) -> x[1]
   a
 , {}
 .startWith {}
-
-# Dead Stream
-DeadStream = new Rx.Subject
 
 Rx.Observable.fromEvent document, "DOMContentLoaded"
 .subscribe =>

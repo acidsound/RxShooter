@@ -124,17 +124,28 @@ let ShipStream = Rx.Observable.merge(
   y: c.height - 100
 });
 
-let paintEnemy = ({x,y}) => ctx.drawImage(enemyImg, x, y, 64, 64);
-let paintEnemies = enemies => (() => {
-  let result = [];
-  for (let _ in enemies) {
-    let enemy = enemies[_];
-    result.push(paintEnemy(enemy));
-  }
-  return result;
-})() ;
+// Dead Stream
+let DeadStream = new Rx.Subject;
 
 /* EnemyStream */
+let paintEnemy = ({x,y}) => ctx.drawImage(enemyImg, x, y, 64, 64);
+let paintEnemies = (enemies, ship) =>
+  (() => {
+    let result = [];
+    for (let _ in enemies) {
+      let enemy = enemies[_];
+      let item;
+      paintEnemy(enemy);
+      if (collision(ship, shipImg, enemy, enemyImg)) {
+        DeadStream.next(ship);
+        item = enemy.y = c.height + 100;
+      }
+      result.push(item);
+    }
+    return result;
+  })()
+;
+
 let EnemyStream = Rx.Observable.interval(950)
 .map(() =>
     ({
@@ -228,9 +239,6 @@ let ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map(x => x[1])
 }
 , {})
 .startWith({});
-
-// Dead Stream
-let DeadStream = new Rx.Subject;
 
 Rx.Observable.fromEvent(document, "DOMContentLoaded")
 .subscribe(() => {
