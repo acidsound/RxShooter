@@ -3,10 +3,14 @@
 ### setup canvas ###
 c = document.createElement 'canvas'
 document.body.style.margin = 0
+document.body.style.height = '100%'
+document.body.style.overflow = 'hidden'
 document.body.appendChild c
 c.width = window.innerWidth
 c.height = window.innerHeight
 ctx = c.getContext '2d'
+
+FPS = 16
 
 ### load bitmaps ###
 shipImg = new Image
@@ -60,8 +64,8 @@ explosionSubject = new Rx.Subject
 explosionSubject.subscribe ({x,y}) ->
   explosionSound.currentTime = 0.5
   explosionSound.play()
-  Rx.Observable.interval(16).takeWhile (frame) ->
-    frame < explosionSpriteCount * 2
+  Rx.Observable.interval FPS
+  .takeWhile (frame) -> frame < explosionSpriteCount * 2
   .subscribe (frame) ->
     cnt = frame > explosionSpriteCount and explosionSpriteCount - (frame >> 1) or frame
     ctx.drawImage explosionSprite, explosionSprite.height * cnt, 0, explosionSprite.height, explosionSprite.height, x - 32, y - 32, 128, 128
@@ -96,7 +100,7 @@ ShipStream = Rx.Observable.merge(
   Rx.Observable.fromEvent(c, 'mousemove')
   Rx.Observable.fromEvent(c, 'touchmove')
 )
-.map ({clientX, clientY}) ->
+.map ({clientX}) ->
     x: clientX - 32
     y: c.height - 100
 .startWith
@@ -108,7 +112,7 @@ paintEnemies = (enemies) -> paintEnemy enemy for _, enemy of enemies
 
 ### EnemyStream ###
 EnemyStream = Rx.Observable.interval 950
-.map (o) ->
+.map ->
     x: Math.random() * c.width - (enemyImg.width)
     y: -enemyImg.height
     vx: Math.random() * 2 - 1
@@ -116,7 +120,7 @@ EnemyStream = Rx.Observable.interval 950
     t: +new Date
 .map (b) ->
   Rx.Observable.interval 9
-  .map (d) -> Object.assign b, x: b.x + b.vx, y: b.y + b.vy
+  .map -> Object.assign b, x: b.x + b.vx, y: b.y + b.vy
 .flatMap (o) -> o
 .scan (a, b) ->
   ### grouping ###
@@ -143,7 +147,7 @@ ProjectileTrig = Rx.Observable.merge(
   Rx.Observable.fromEvent(c, 'touchstart')
 )
 
-ProjectileTrig.subscribe (o) -> shootSubject.next()
+ProjectileTrig.subscribe -> shootSubject.next()
 
 ###
   trigger + ship
@@ -172,20 +176,55 @@ ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map (x) -> x[1]
 , {}
 .startWith {}
 
-### Combine All ###
+# Dead Stream
+DeadStream = new Rx.Subject
+
 Rx.Observable.fromEvent document, "DOMContentLoaded"
 .subscribe =>
-  # TODO Loading Splash 구현
-  PreloadSteam.subscribe console.log,
-    -> console.log "error"
-    -> # on Complete
-      console.log "init"
-      Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
-        (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
-      .sample Rx.Observable.interval(16)
-      .takeWhile -> true
-      .subscribe ({stars, ship, projectiles, enemies}) ->
-        paintStars stars
-        paintShip ship
-        paintProjectiles projectiles, enemies
-        paintEnemies enemies, ship
+  goGame = =>
+    console.log "game"
+    ### Combine All ###
+    Rx.Observable.combineLatest StarStream, ShipStream, ProjectileStream, EnemyStream,
+      (stars, ship, projectiles, enemies) -> {stars,ship,projectiles,enemies}
+    .sample Rx.Observable.interval FPS
+    .takeUntil DeadStream
+    .subscribe ({stars, ship, projectiles, enemies}) ->
+      paintStars stars
+      paintShip ship
+      paintProjectiles projectiles, enemies
+      paintEnemies enemies, ship
+
+  paintTitle = (t)->
+    ctx.fillStyle = "#363636"
+    ctx.fillRect 0, 0, c.width, c.height
+    ctx.fillStyle = "#eaeaea"
+    ctx.textAlign = "center"
+    ctx.font = "3rem arial"
+    [x, y] = [c.width / 2, c.height/2]
+    ctx.fillText "RxShooter", x, y + Math.sin(t/7)*15 - 20
+    ctx.font = "1rem arial"
+    ctx.fillText "click to start", x, y+30
+  goTitle = ->
+    TitleStream = Rx.Observable.fromEvent c, "mouseup"
+    Rx.Observable.interval FPS
+    .takeUntil TitleStream
+    .subscribe paintTitle, (->), goGame
+
+  paintSplash = (t)->
+    int2hex = (i)-> "0#{i.toString(16)}".toString(16).substr(-2)
+    q = int2hex (255-t*3)>0 && 255-t*3 || 0
+    ctx.fillStyle = "##{q}#{q}#{q}"
+    ctx.fillRect 0, 0, c.width, c.height
+    ctx.fillStyle = "#eaeaea"
+    ctx.font = "3rem arial"
+    ctx.textAlign = "center"
+    #noinspection JSUnresolvedVariable
+    [x,y]=[c.width/2, c.height/2]
+    ctx.fillText "Appsoulute", x, y - 25
+    ctx.fillText "games", x, y + 25 if t>150
+  goSplash = ->
+    Rx.Observable.interval FPS
+    .takeUntil Rx.Observable.timer 5000
+    .subscribe paintSplash, (->), goTitle
+  goSplash()
+

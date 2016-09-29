@@ -1,10 +1,14 @@
 /* setup canvas */
 let c = document.createElement('canvas');
 document.body.style.margin = 0;
+document.body.style.height = '100%';
+document.body.style.overflow = 'hidden';
 document.body.appendChild(c);
 c.width = window.innerWidth;
 c.height = window.innerHeight;
 let ctx = c.getContext('2d');
+
+const FPS = 16;
 
 /* load bitmaps */
 let shipImg = new Image;
@@ -68,7 +72,8 @@ let explosionSubject = new Rx.Subject;
 explosionSubject.subscribe(function({x,y}) {
   explosionSound.currentTime = 0.5;
   explosionSound.play();
-  return Rx.Observable.interval(16).takeWhile(frame => frame < explosionSpriteCount * 2)
+  return Rx.Observable.interval(FPS)
+  .takeWhile(frame => frame < explosionSpriteCount * 2)
   .subscribe(function(frame) {
     let cnt = (frame > explosionSpriteCount && (explosionSpriteCount - (frame >> 1))) || frame;
     return ctx.drawImage(explosionSprite, explosionSprite.height * cnt, 0, explosionSprite.height, explosionSprite.height, x - 32, y - 32, 128, 128);
@@ -108,7 +113,7 @@ let ShipStream = Rx.Observable.merge(
   Rx.Observable.fromEvent(c, 'mousemove'),
   Rx.Observable.fromEvent(c, 'touchmove')
 )
-.map(({clientX, clientY}) =>
+.map(({clientX}) =>
     ({
       x: clientX - 32,
       y: c.height - 100
@@ -131,7 +136,7 @@ let paintEnemies = enemies => (() => {
 
 /* EnemyStream */
 let EnemyStream = Rx.Observable.interval(950)
-.map(o =>
+.map(() =>
     ({
       x: (Math.random() * c.width) - (enemyImg.width),
       y: -enemyImg.height,
@@ -142,7 +147,7 @@ let EnemyStream = Rx.Observable.interval(950)
 )
 .map(b =>
   Rx.Observable.interval(9)
-  .map(d => Object.assign(b, {x: b.x + b.vx, y: b.y + b.vy}))
+  .map(() => Object.assign(b, {x: b.x + b.vx, y: b.y + b.vy}))
 )
 .flatMap(o => o)
 .scan(function(a, b) {
@@ -187,7 +192,7 @@ let ProjectileTrig = Rx.Observable.merge(
   Rx.Observable.fromEvent(c, 'touchstart')
 );
 
-ProjectileTrig.subscribe(o => shootSubject.next());
+ProjectileTrig.subscribe(() => shootSubject.next());
 
 /*
   trigger + ship
@@ -224,25 +229,63 @@ let ProjectileStream = ProjectileTrig.withLatestFrom(ShipStream).map(x => x[1])
 , {})
 .startWith({});
 
-/* Combine All */
+// Dead Stream
+let DeadStream = new Rx.Subject;
+
 Rx.Observable.fromEvent(document, "DOMContentLoaded")
 .subscribe(() => {
-  // TODO Loading Splash 구현
-  return PreloadSteam.subscribe(console.log,
-    () => console.log("error"),
-    function() { // on Complete
-      console.log("init");
-      return Rx.Observable.combineLatest(StarStream, ShipStream, ProjectileStream, EnemyStream,
-        (stars, ship, projectiles, enemies) => ({stars,ship,projectiles,enemies}))
-      .sample(Rx.Observable.interval(16))
-      .takeWhile(() => true)
-      .subscribe(function({stars, ship, projectiles, enemies}) {
-        paintStars(stars);
-        paintShip(ship);
-        paintProjectiles(projectiles, enemies);
-        return paintEnemies(enemies, ship);
-      });
-    }
-  );
+  let goGame = () => {
+    console.log("game");
+    /* Combine All */
+    return Rx.Observable.combineLatest(StarStream, ShipStream, ProjectileStream, EnemyStream,
+      (stars, ship, projectiles, enemies) => ({stars,ship,projectiles,enemies}))
+    .sample(Rx.Observable.interval(FPS))
+    .takeUntil(DeadStream)
+    .subscribe(function({stars, ship, projectiles, enemies}) {
+      paintStars(stars);
+      paintShip(ship);
+      paintProjectiles(projectiles, enemies);
+      return paintEnemies(enemies, ship);
+    });
+  };
+
+  let paintTitle = function(t){
+    ctx.fillStyle = "#363636";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#eaeaea";
+    ctx.textAlign = "center";
+    ctx.font = "3rem arial";
+    let [x, y] = [c.width / 2, c.height/2];
+    ctx.fillText("RxShooter", x, (y + (Math.sin(t/7)*15)) - 20);
+    ctx.font = "1rem arial";
+    return ctx.fillText("click to start", x, y+30);
+  };
+  let goTitle = function() {
+    let TitleStream = Rx.Observable.fromEvent(c, "mouseup");
+    return Rx.Observable.interval(FPS)
+    .takeUntil(TitleStream)
+    .subscribe(paintTitle, (function() {}), goGame);
+  };
+
+  let paintSplash = function(t){
+    let int2hex = i=> `0${i.toString(16)}`.toString(16).substr(-2);
+    let q = int2hex(((255-(t*3))>0 && (255-(t*3))) || 0);
+    ctx.fillStyle = `#${q}${q}${q}`;
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#eaeaea";
+    ctx.font = "3rem arial";
+    ctx.textAlign = "center";
+    //noinspection JSUnresolvedVariable
+    let [x,y]=[c.width/2, c.height/2];
+    ctx.fillText("Appsoulute", x, y - 25);
+    if (t>150) { return ctx.fillText("games", x, y + 25); }
+  };
+  let goSplash = () =>
+    Rx.Observable.interval(FPS)
+    .takeUntil(Rx.Observable.timer(5000))
+    .subscribe(paintSplash, (function() {}), goTitle)
+  ;
+  return goSplash();
 }
 );
+
