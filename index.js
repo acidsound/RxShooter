@@ -234,6 +234,22 @@ let DeadStream = new Rx.Subject;
 
 Rx.Observable.fromEvent(document, "DOMContentLoaded")
 .subscribe(() => {
+  let paintGameOver = function(t){
+    ctx.fillStyle = "#ea3a3a";
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = "#eaeaea";
+    ctx.textAlign = "center";
+    ctx.font = "3rem arial";
+    let [x, y] = [c.width / 2, c.height / 2];
+    ctx.fillText("Game", x, y - 20);
+    return ctx.fillText("Over", x, y + 20);
+  };
+  let goGameOver = () =>
+    Rx.Observable.interval(FPS)
+    .takeUntil(Rx.Observable.timer(3500))
+    .subscribe(paintGameOver, (function() {}), goTitle)
+  ;
+
   let goGame = () => {
     console.log("game");
     /* Combine All */
@@ -246,9 +262,9 @@ Rx.Observable.fromEvent(document, "DOMContentLoaded")
       paintShip(ship);
       paintProjectiles(projectiles, enemies);
       return paintEnemies(enemies, ship);
-    });
+    }
+    ,(function() {}) ,goGameOver);
   };
-
   let paintTitle = function(t){
     ctx.fillStyle = "#363636";
     ctx.fillRect(0, 0, c.width, c.height);
@@ -260,7 +276,7 @@ Rx.Observable.fromEvent(document, "DOMContentLoaded")
     ctx.font = "1rem arial";
     return ctx.fillText("click to start", x, y+30);
   };
-  let goTitle = function() {
+  var goTitle = function() {
     let TitleStream = Rx.Observable.fromEvent(c, "mouseup");
     return Rx.Observable.interval(FPS)
     .takeUntil(TitleStream)
@@ -275,8 +291,7 @@ Rx.Observable.fromEvent(document, "DOMContentLoaded")
     ctx.fillStyle = "#eaeaea";
     ctx.font = "3rem arial";
     ctx.textAlign = "center";
-    //noinspection JSUnresolvedVariable
-    let [x,y]=[c.width/2, c.height/2];
+    let [x, y] = [c.width/2, c.height/2];
     ctx.fillText("Appsoulute", x, y - 25);
     if (t>150) { return ctx.fillText("games", x, y + 25); }
   };

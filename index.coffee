@@ -181,6 +181,20 @@ DeadStream = new Rx.Subject
 
 Rx.Observable.fromEvent document, "DOMContentLoaded"
 .subscribe =>
+  paintGameOver = (t)->
+    ctx.fillStyle = "#ea3a3a"
+    ctx.fillRect 0, 0, c.width, c.height
+    ctx.fillStyle = "#eaeaea"
+    ctx.textAlign = "center"
+    ctx.font = "3rem arial"
+    [x, y] = [c.width / 2, c.height / 2]
+    ctx.fillText "Game", x, y - 20
+    ctx.fillText "Over", x, y + 20
+  goGameOver = ->
+    Rx.Observable.interval FPS
+    .takeUntil Rx.Observable.timer 3500
+    .subscribe paintGameOver, (->), goTitle
+
   goGame = =>
     console.log "game"
     ### Combine All ###
@@ -193,7 +207,7 @@ Rx.Observable.fromEvent document, "DOMContentLoaded"
       paintShip ship
       paintProjectiles projectiles, enemies
       paintEnemies enemies, ship
-
+    ,(->) ,goGameOver
   paintTitle = (t)->
     ctx.fillStyle = "#363636"
     ctx.fillRect 0, 0, c.width, c.height
@@ -218,8 +232,7 @@ Rx.Observable.fromEvent document, "DOMContentLoaded"
     ctx.fillStyle = "#eaeaea"
     ctx.font = "3rem arial"
     ctx.textAlign = "center"
-    #noinspection JSUnresolvedVariable
-    [x,y]=[c.width/2, c.height/2]
+    [x, y] = [c.width/2, c.height/2]
     ctx.fillText "Appsoulute", x, y - 25
     ctx.fillText "games", x, y + 25 if t>150
   goSplash = ->
